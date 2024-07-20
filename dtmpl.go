@@ -41,11 +41,15 @@ import (
 // input/output directories
 var ind, outd string
 
+// TODO: most of those should be CLI params
 var tmplExt = ".tmpl"
 var jsonExt = ".json"
 
 var dbDir = "db"
 var dbFn  = "db.json"
+
+// TODO: use it + CLI params
+var templatesDir = "templates"
 
 type FNs map[string]any
 
@@ -90,7 +94,8 @@ func loadFNs(ind string) (FNs, error) {
 			return err
 		}
 
-		// useless
+		// useless entry (but should be essentially benign because
+		// of the following TrimPrefix).
 		if path == ind {
 			return nil
 		}
@@ -102,8 +107,6 @@ func loadFNs(ind string) (FNs, error) {
 
 		return nil
 	})
-
-//	fmt.Fprint(os.Stderr, fns)
 
 	return fns, err
 }
@@ -128,8 +131,7 @@ func doParseDBFile(path string, to *any) error {
 	return nil
 }
 
-// TODO: ind as a global
-func storeDBFile(path string, db DB, y any) error {
+func storeDBFile(ind, path string, db DB, y any) error {
 	// NOTE: extra os.PathSeparator is requires, for filepath.Join
 	// would trim it (even with a "db/"), and splitPath would return
 	// an array starting with an empty string.
@@ -179,17 +181,19 @@ func storeDBFile(path string, db DB, y any) error {
 
 	return nil
 }
+
 // TODO: manage deeper nesting / no-nesting
-func parseDBFile(path string, db DB) error {
+func parseDBFile(ind, path string, db DB) error {
 	var y any
 	if err := doParseDBFile(path, &y); err != nil {
 		return err
 	}
 
-	return storeDBFile(path, db, y)
+	return storeDBFile(ind, path, db, y)
 }
 
-func loadDBDir(dbd string, db DB) (DB, error) {
+func loadDBDir(ind string, db DB) (DB, error) {
+	dbd := filepath.Join(ind, dbDir)
 	err := filepath.Walk(dbd, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -199,7 +203,7 @@ func loadDBDir(dbd string, db DB) (DB, error) {
 			return nil
 		}
 
-		return parseDBFile(path, db)
+		return parseDBFile(ind, path, db)
 	})
 
 	return db, err
@@ -216,7 +220,7 @@ func loadDB(ind string) (DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s: %s", fn, err)
 	}
-	return loadDBDir(filepath.Join(ind, dbDir), db)
+	return loadDBDir(ind, db)
 }
 
 func getKeys[T any] (xs map[string]T) []string {
@@ -243,27 +247,6 @@ func addToPATH(p string) string {
 func loadTmpls(ind string, db DB) *template.Template {
 	var tmpls *template.Template
 	tmpls = template.Must(template.New("").Funcs(template.FuncMap{
-		"append" :  func(xs []any, ys []any) []any {
-			return append(xs, ys...)
-		},
-		"join" : func(xs []any, d string) string {
-			ys := make([]string, len(xs))
-			for i, x := range xs {
-				ys[i] = fmt.Sprint(x)
-			}
-			return strings.Join(ys, d)
-		},
-		"contains" : func(s, substr string) bool {
-			return strings.Contains(s, substr)
-		},
-		"warn" : func(s string) string {
-			fmt.Fprintf(os.Stderr, "Warning: %s\n", s)
-			return ""
-		},
-		"isURL" : func(s string) bool {
-			_, err := url.ParseRequestURI(s)
-			return err == nil
-		},
 		"add" : func(a, b any) (int, error) {
 			an, ok := a.(int)
 			if !ok {
@@ -293,32 +276,27 @@ func loadTmpls(ind string, db DB) *template.Template {
 
 			return an+bn, nil
 		},
-		"sarr" : func(xs ...string) []string {
-			return xs
+		"append" :  func(xs []any, ys []any) []any {
+			return append(xs, ys...)
 		},
 		"arr" : func(xs ...any) []any {
 			return xs
 		},
-		"wrap" : func(xs ...any) any {
-			return map[string]any {
-				"db"   : db,
-				"args" : xs,
-			}
+		"contains" : func(s, substr string) bool {
+			return strings.Contains(s, substr)
 		},
-		"parse" : func(ts string) (string, error) {
-			t, err := template.Must(tmpls.Clone()).Parse(ts)
+		"datefmt" : func(ds, inf, outf string) (string, error) {
+			if inf == "" {
+				inf = time.RFC3339
+			}
+			if outf == "" {
+				outf = inf
+			}
+			d, err := time.Parse(inf, ds)
 			if err != nil {
 				return "", err
 			}
-
-			var s strings.Builder
-			err = t.Execute(&s, map[string]any{
-				"db" : db,
-			})
-			return s.String(), err
-		},
-		"now" : func() time.Time {
-			return time.Now()
+			return d.Format(outf), nil
 		},
 		"exists" : func(path string) (bool, error) {
 			if _, err := os.Stat(filepath.Join(ind, path)); err == nil {
@@ -339,9 +317,34 @@ func loadTmpls(ind string, db DB) *template.Template {
 			}
 			return string(xs), err
 		},
+		"isURL" : func(s string) bool {
+			_, err := url.ParseRequestURI(s)
+			return err == nil
+		},
+		"join" : func(xs []any, d string) string {
+			ys := make([]string, len(xs))
+			for i, x := range xs {
+				ys[i] = fmt.Sprint(x)
+			}
+			return strings.Join(ys, d)
+		},
+		"now" : func() time.Time {
+			return time.Now()
+		},
+		"parse" : func(ts string) (string, error) {
+			t, err := template.Must(tmpls.Clone()).Parse(ts)
+			if err != nil {
+				return "", err
+			}
+
+			var s strings.Builder
+			err = t.Execute(&s, map[string]any{
+				"db" : db,
+			})
+			return s.String(), err
+		},
 		// Some of that is more thoroughly documented here:
-		//	- https://tales.mbivert.com/on-a-pool-of-go-templates/
-		//	- https://tales.mbivert.com/on-piping-go-templates-to-shell/
+		//	https://tales.mbivert.com/on-piping-go-templates-to-shell/
 		"run" : func(this *template.Template, cmd []string, x string, targs ...any) (string, error) {
 			t := template.Must(this.Clone())
 
@@ -382,23 +385,24 @@ func loadTmpls(ind string, db DB) *template.Template {
 
 			return s.String(), nil
 		},
-		"datefmt" : func(ds, inf, outf string) (string, error) {
-			if inf == "" {
-				inf = time.RFC3339
+		"sarr" : func(xs ...string) []string {
+			return xs
+		},
+		"warn" : func(s string) string {
+			fmt.Fprintf(os.Stderr, "Warning: %s\n", s)
+			return ""
+		},
+		"wrap" : func(xs ...any) any {
+			return map[string]any {
+				"db"   : db,
+				"args" : xs,
 			}
-			if outf == "" {
-				outf = inf
-			}
-			d, err := time.Parse(inf, ds)
-			if err != nil {
-				return "", err
-			}
-			return d.Format(outf), nil
 		},
 	}).ParseGlob(filepath.Join(ind, "templates/*")))
 
 	// Make functions out of the default templates from the
-	// templates/ directory.
+	// templates/ directory. For more, see
+	//	https://tales.mbivert.com/on-a-pool-of-go-templates/
 	for _, x := range tmpls.Templates() {
 		n := strings.TrimSuffix(x.Name(), tmplExt)
 		// beware of the race...
@@ -431,10 +435,14 @@ func deepGet(db DB, xs []string) (any, error) {
 		}
 		r, ok := q.(map[string]any)
 		if !ok {
-			// TODO error
-			panic("-__-")
+			if _, ok := q.(string); ok {
+				return nil, fmt.Errorf("Can't go further in DB (%s)",
+					strings.Join(xs[:n], " -> "))
+			}
+			// Internal error (~assert)
+			panic("O__o")
 		}
-			p = r
+		p = r
 	}
 
 	return nil, fmt.Errorf("not found")
@@ -462,7 +470,7 @@ func tmplFile(from, to string, db DB) error {
 	// We're trying to make this interface more "uniform".
 	return t.ExecuteTemplate(fh, filepath.Base(from), map[string]any{
 		"db"   : db,
-		"this" : t,
+		"this" : t, // seems it's still used for run()
 	})
 }
 
@@ -502,14 +510,17 @@ func dtmpl(ind, outd string) error {
 		return err
 	}
 
-	if x, ok := fns[ind].(FNs); ok {
-		fns = x
-	} else {
-//		panic("O__O")
+	// filenames in fns are relative to ind
+	// (~assert)
+	if _, ok := fns[ind].(FNs); ok {
+		panic("O__O")
 	}
 
 	a, _ := json.MarshalIndent(db, "", "    ")
 	fmt.Fprintf(os.Stderr, "db = %s\n", string(a))
+
+	b, _ := json.MarshalIndent(fns, "", "    ")
+	fmt.Fprintf(os.Stderr, "fns = %s\n", string(b))
 
 	// Generate file contents
 	return tmplFiles(outd, fns, db, []string{outd})
@@ -535,7 +546,12 @@ func init() {
 
 	ind, outd = filepath.Clean(os.Args[1]), filepath.Clean(os.Args[2])
 
-	// TODO: systematically trim before / have an option to?
+	// NOTE: As RemoveAll() is preferable, I haven't dig deeper, but
+	// without the RemoveAll(), there's sometimes garbage by the end
+	// of the generated files.
+	if err = os.RemoveAll(outd); err != nil {
+		fails(err)
+	}
 	if err = os.MkdirAll(outd, os.ModePerm); err != nil {
 		fails(err)
 	}
