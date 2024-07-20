@@ -1,0 +1,42 @@
+.Dd $Mdocdate$
+.Dt dtmpl 1
+.Os dtmpl 1.0
+.Sh NAME
+.Nm dtmpl
+.Nd Deep/directory templater 1.0
+.Sh SYNOPSIS
+.Nm
+.Ar <input/>
+.Ar <output/>
+.Sh DESCRIPTION
+.Nm
+processes an input directory to an output directory,
+processing files suffixed by
+.Sy .tmpl
+.Xr go 1
+'s
+.Sy text/template .
+All the files which aren't suffixed by
+.Sy .tmpl
+are copied from the input directory to the output directory.
+.Pp
+The input directory may furthermore contain:
+.Bl -enum
+.It
+A
+.Sy db.json
+file and/or a
+.Sy db/
+directory: both of them describe a (deep) JSON-encoded database,
+which is made available to the executed templates (input pipeline
+is a hash containaing a
+.Sy "db"
+field);
+.It
+a
+.Sy template/
+directory, which cotains a bunch of "utility" template files,
+which can call each other, and can be called from the
+.Sy .tmpl -suffixed
+files.
+.El
