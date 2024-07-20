@@ -48,6 +48,8 @@ var jsonExt = ".json"
 var dbDir = "db"
 var dbFn  = "db.json"
 
+var dropDB = true
+
 // TODO: use it + CLI params
 var templatesDir = "templates"
 
@@ -97,6 +99,15 @@ func loadFNs(ind string) (FNs, error) {
 		// useless entry (but should be essentially benign because
 		// of the following TrimPrefix).
 		if path == ind {
+			return nil
+		}
+
+		// Those have been loaded separately, and we
+		// don't want to bring them to the output directory
+		if dropDB && path == filepath.Join(ind, dbFn) {
+			return nil
+		}
+		if dropDB && strings.HasPrefix(path, filepath.Join(ind, dbDir)) {
 			return nil
 		}
 
