@@ -24,6 +24,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"io/fs"
 	"log"
@@ -50,8 +51,7 @@ var dbFn  = "db.json"
 
 var dropDB = true
 
-// TODO: use it + CLI params
-var templatesDir = "templates"
+var tmplsDir = "templates"
 
 type FNs map[string]any
 
@@ -409,7 +409,7 @@ func loadTmpls(ind string, db DB) *template.Template {
 				"args" : xs,
 			}
 		},
-	}).ParseGlob(filepath.Join(ind, "templates/*")))
+	}).ParseGlob(filepath.Join(ind, tmplsDir+"/*")))
 
 	// Make functions out of the default templates from the
 	// templates/ directory. For more, see
@@ -551,11 +551,23 @@ func fails(err error) {
 func init() {
 	var err error
 
-	if len(os.Args) != 3 {
+	// TODO: have those+tmplsDir be not relative to ind but paths
+	// to exact files instead (too magic)
+	flag.StringVar(&dbFn,  "dbFn",  dbFn,  "Default path to db.json (relative to ind)")
+	flag.StringVar(&dbDir, "dbDir", dbDir, "Default path to db/ (relative to ind)")
+
+	flag.StringVar(&tmplExt, "tmplExt", tmplExt, "Default template files extension")
+	flag.StringVar(&tmplsDir, "tmplsDir", tmplsDir, "Default path to template/ (relative to ind)")
+
+	flag.BoolVar(&dropDB, "dropDB", dropDB, "By default, don't output the input db-related files")
+
+	flag.Parse()
+
+	if len(flag.Args()) != 2 {
 		help(1)
 	}
 
-	ind, outd = filepath.Clean(os.Args[1]), filepath.Clean(os.Args[2])
+	ind, outd = filepath.Clean(flag.Args()[0]), filepath.Clean(flag.Args()[1])
 
 	// NOTE: As RemoveAll() is preferable, I haven't dig deeper, but
 	// without the RemoveAll(), there's sometimes garbage by the end
