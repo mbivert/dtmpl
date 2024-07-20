@@ -1,5 +1,5 @@
 # Introduction
-``dtmpl(1)`` processes an input directory to an output directory,
+``dtmpl(1)`` compiles an input directory to an output directory,
 processing files suffixed by ``.tmpl`` with ``go(1)``'s
 [``text/template``][go-text/template]. *All* the files which
 aren't suffixed by ``.tmpl`` are copied from the input directory
@@ -15,7 +15,9 @@ The input directory may furthermore contain:
   ``.tmpl`` files.
 
 You can see it being used as a primitive static site generator
-[here][gh-mb-bargue].
+[here][gh-mb-bargue]. You might be interested to use ``dtmpl(1)``
+in combination with [``dp(1) (directory pipe)``][gh-mb-dp].
 
 [go-text/template]: https://pkg.go.dev/text/template
-[gh-mb-bargue]: https://github.com/mbivert/bargue/
+[gh-mb-bargue]:     https://github.com/mbivert/bargue/
+[gh-mb-dp]:         https://github.com/mbivert/dp/

@@ -2,8 +2,9 @@ package main
 
 // dtpml(1) - Deep/directory template
 //
-// Compile an input directory to an output directory, by
-// templatizing some input files via go(1)'s text/template.
+// Compiles an input directory to an output directory, by
+// processing  input files suffixed with ".tmpl" via
+// go(1)'s text/template.
 //
 // This can typically be used e.g. to implement a basic static
 // site generator.
