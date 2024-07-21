@@ -408,7 +408,7 @@ func loadTmpls(ind string, db DB) *template.Template {
 				// NOTE: we use a file instead of a pipe to avoid having
 				// to deal with process synchronization
 				fn := filepath.Join("/tmp", x)
-				f, err := os.OpenFile(fn, os.O_RDWR|os.O_CREATE, 0644)
+				f, err := os.Create(fn)
 				if err != nil {
 					return "", err
 				}
@@ -508,7 +508,9 @@ func tmplFile(from, to string, db DB) error {
 		return err
 	}
 
-	fh, err := os.OpenFile(to, os.O_RDWR|os.O_CREATE, 0644)
+	// os.Create will truncate (os.O_TRUNC) the file. That's
+	// really desired.
+	fh, err := os.Create(to)
 	defer fh.Close()
 	if err != nil {
 		return err
@@ -609,9 +611,12 @@ func init() {
 
 	ind, outd = filepath.Clean(flag.Args()[0]), filepath.Clean(flag.Args()[1])
 
-	// NOTE: As RemoveAll() is preferable, I haven't dig deeper, but
-	// without the RemoveAll(), there's sometimes garbage by the end
-	// of the generated files.
+	// NOTE: RemoveAll() feels preferable by default. We used to have
+	// a bug "purposely hidden" by the RemoveAll(): output files were
+	// opened with os.OpenFile without os.O_TRUNC, and garbage remained
+	// by the end of the files.
+	//
+	// We're now using os.Create() which truncates the files.
 	if err = os.RemoveAll(outd); err != nil {
 		fails(err)
 	}
