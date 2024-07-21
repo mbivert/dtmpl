@@ -259,6 +259,18 @@ func addToPATH(p string) string {
 	return path+":"+p
 }
 
+func pathExists(path string) (bool, error) {
+	if _, err := os.Stat(path); err == nil {
+		return true, nil
+	} else if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	} else {
+		return false, err
+	}
+
+	return false, nil
+}
+
 func loadTmpls(ind string, db DB) *template.Template {
 	var tmpls *template.Template
 	tmpls = template.Must(template.New("").Funcs(template.FuncMap{
@@ -314,15 +326,7 @@ func loadTmpls(ind string, db DB) *template.Template {
 			return d.Format(outf), nil
 		},
 		"exists" : func(path string) (bool, error) {
-			if _, err := os.Stat(filepath.Join(ind, path)); err == nil {
-				return true, nil
-			} else if errors.Is(err, os.ErrNotExist) {
-				return false, nil
-			} else {
-				return false, err
-			}
-
-			return false, nil
+			return pathExists(filepath.Join(ind, path))
 		},
 		"include" : func(path string) (string, error) {
 			path = filepath.Join(ind, path)
@@ -346,6 +350,38 @@ func loadTmpls(ind string, db DB) *template.Template {
 		"now" : func() time.Time {
 			return time.Now()
 		},
+		"maybeparsefn" : func(ts string) (string, error) {
+			fn := filepath.Join(ind, ts)
+			ok, err := pathExists(fn)
+
+			// Shouldn't happen
+			if err != nil {
+				return "", err
+
+			// *maybe*
+			} else if !ok {
+				return "", nil
+			}
+
+			// The cloning will make all the utilities from the templates/
+			// directory available.
+			t, err := template.Must(tmpls.Clone()).Delims("{{<", ">}}").ParseFiles(fn)
+			if err != nil {
+				return "", err
+			}
+
+			// Because we've cloned, if we try a t.Execute(), we may be
+			// executing some random template from our template set. The
+			// one we've just added will have this name exactly:
+			tn := filepath.Base(fn)
+
+			var s strings.Builder
+			err = t.ExecuteTemplate(&s, tn, map[string]any{
+				"db" : db,
+			})
+			return s.String(), err
+		},
+		// XXX/TODO: which delimiters do we want here?
 		"parse" : func(ts string) (string, error) {
 			t, err := template.Must(tmpls.Clone()).Parse(ts)
 			if err != nil {
