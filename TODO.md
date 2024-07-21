@@ -3,8 +3,7 @@ This has been roughly tested by hand, but we'll want specific,
 per-function tests (some of them are bug-prone).
 
 # Documentation @documentation @man-page
-In particular, complete the man page and describe the template
-usage conventions.
+Document the template functions.
 
 # Templatized filenames @template-fn
 **<u>Note:</u>** [``old/dtmpl.go``][gh-mb-dtmpl-old] is a rough,

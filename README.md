@@ -1,23 +1,80 @@
-# Introduction
-``dtmpl(1)`` compiles an input directory to an output directory,
-processing files suffixed by ``.tmpl`` with ``go(1)``'s
-[``text/template``][go-text/template]. *All* the files which
-aren't suffixed by ``.tmpl`` are copied from the input directory
-to the output directory.
+# dtmpl(1) - deep/directory templater
 
-The input directory may furthermore contain:
-
-  - a ``db.json`` file and/or a ``db/`` directory: both of them
-  describe a JSON-encoded database which is made available to
-  executed templates;
-  - a ``templates/`` directory, which contains a bunch of "utility"
-  templates, which can call each other, and can be called from the
-  ``.tmpl`` files.
-
-You can see it being used as a primitive static site generator
-[here][gh-mb-bargue]. You might be interested to use ``dtmpl(1)``
-in combination with [``dp(1) (directory pipe)``][gh-mb-dp].
-
-[go-text/template]: https://pkg.go.dev/text/template
-[gh-mb-bargue]:     https://github.com/mbivert/bargue/
-[gh-mb-dp]:         https://github.com/mbivert/dp/
+    dtmpl(1)                     General Commands Manual                   dtmpl(1)
+    
+    NAME
+           dtmpl — deep/directory templater 1.0
+    
+    SYNOPSIS
+           dtmpl [-h]
+           dtmpl  [-f 'db.json'] [-d 'db/'] [-e '.tmpl'] [-t 'templates/'] <input/>
+                 <output/>
+    
+    DESCRIPTION
+           dtmpl processes  an  input  directory  input/  to  an  output  directory
+           output/,  processing  files  suffixed  by  .tmpl (can be altered via -e)
+           go(1) 's text/template (see https://pkg.go.dev/text/template) All  files
+           which  aren't  suffixed  by .tmpl are copied from the input directory to
+           the output directory.
+    
+           The input directory may furthermore contain:
+    
+           1.   A db.json file and/or a db/ directory:  both  of  them  describe  a
+                (deep)  JSON-encoded  database, which is made available to the exe‐
+                cuted templates (input pipeline is a hash containaing a db field);
+    
+           2.   a templates/ directory, which cotains a bunch of "utility" template
+                files, which can call each other, and can be called from the  .tmpl
+                -suffixed files.
+    
+           By default, those files aren't preserved to the output directory, unless
+           -k is provided.
+    
+    TEMPLATE CONVENTIONS
+           All  the  template  files  in  the  templates/ directory are provided as
+           template functions, meaning, a template file templates/foo  is  callable
+           as
+    
+                     {{< foo arg0 arg1 >}}
+           Or
+    
+                     {{< template "foo" wrap arg0 arg1 >}}
+    
+           Where ‘wrap’ is a template functions, described in the next section.
+    
+           The  point  of  ‘wrap’  or of making the templates "callable" is to have
+           them all share a similar interface: all the .tmpl suffixed files as well
+           as all the templates from the templates/ directory are provided  with  a
+           "hash-pipeline" containing:
+    
+           1.   A ‘db’ entry, which contains the parsed db.json and db/
+    
+           2.   Eventually  for  the  templates  from  the  templates/ directory, a
+                ‘args’ entry, which contains an array with all the  arguments  pro‐
+                vided to the template.
+    
+           For  example, the ‘wrap’ function mentioned previously is implemented as
+           follow:
+    
+                     "wrap" : func(xs ...any) any {
+                         return map[string]any {
+                                 "db"   : db,
+                                 "args" : xs,
+                         },
+                     },
+    
+           The    technique    is    described    in    greater    details    here:
+           https://tales.mbivert.com/on-a-pool-of-go-templates/
+    
+    TEMPLATE FUNCTIONS
+           For  convenience,  a few base functions are provided for use in the tem‐
+           plates. TODO
+    
+    EXAMPLE
+           Static   site   generator   with    a    bunch    of    extra-templates:
+           https://github.com/mbivert/bargue
+    
+    SEE ALSO
+           dp(1) (see https://github.com/mbivert/dp)
+    
+    dtmpl 1.0                             2024                             dtmpl(1)

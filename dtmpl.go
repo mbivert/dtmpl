@@ -50,7 +50,7 @@ var jsonExt = ".json"
 var dbDir = "db"
 var dbFn  = "db.json"
 
-var dropDB = true
+var keepSpecial = false
 
 var tmplsDir = "templates"
 
@@ -105,10 +105,13 @@ func loadFNs(ind string) (FNs, error) {
 
 		// Those have been loaded separately, and we
 		// don't want to bring them to the output directory
-		if dropDB && path == filepath.Join(ind, dbFn) {
+		if keepSpecial && path == filepath.Join(ind, dbFn) {
 			return nil
 		}
-		if dropDB && strings.HasPrefix(path, filepath.Join(ind, dbDir)) {
+		if keepSpecial && strings.HasPrefix(path, filepath.Join(ind, dbDir)) {
+			return nil
+		}
+		if keepSpecial && strings.HasPrefix(path, filepath.Join(ind, tmplsDir)) {
 			return nil
 		}
 
@@ -554,13 +557,13 @@ func init() {
 
 	// TODO: have those+tmplsDir be not relative to ind but paths
 	// to exact files instead (too magic)
-	flag.StringVar(&dbFn,  "dbFn",  dbFn,  "Default path to db.json (relative to ind)")
-	flag.StringVar(&dbDir, "dbDir", dbDir, "Default path to db/ (relative to ind)")
+	flag.StringVar(&dbFn,  "f",  dbFn,  "Default path to db.json (relative to ind)")
+	flag.StringVar(&dbDir, "d", dbDir, "Default path to db/ (relative to ind)")
 
-	flag.StringVar(&tmplExt, "tmplExt", tmplExt, "Default template files extension")
-	flag.StringVar(&tmplsDir, "tmplsDir", tmplsDir, "Default path to template/ (relative to ind)")
+	flag.StringVar(&tmplExt, "e", tmplExt, "Default template files extension")
+	flag.StringVar(&tmplsDir, "t", tmplsDir, "Default path to template/ (relative to ind)")
 
-	flag.BoolVar(&dropDB, "dropDB", dropDB, "By default, don't output the input db-related files")
+	flag.BoolVar(&keepSpecial, "k", keepSpecial, "By default, trim the input db/template files")
 
 	flag.Parse()
 

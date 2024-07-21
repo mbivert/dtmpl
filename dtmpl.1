@@ -1,32 +1,47 @@
-.Dd $Mdocdate$
+.Dd 2024
 .Dt dtmpl 1
 .Os dtmpl 1.0
 .Sh NAME
 .Nm dtmpl
-.Nd Deep/directory templater 1.0
+.Nd deep/directory templater 1.0
 .Sh SYNOPSIS
 .Nm
+.Bk -words
+.Op Fl h
+.Ek
+.Nm
+.Bk -words
+.Op Fl f Ar 'db.json'
+.Op Fl d Ar 'db/'
+.Op Fl e Ar '.tmpl'
+.Op Fl t Ar 'templates/'
 .Ar <input/>
 .Ar <output/>
 .Sh DESCRIPTION
 .Nm
-processes an input directory to an output directory,
+processes an input directory
+.Ar input/
+to an output directory
+.Ar output/ ,
 processing files suffixed by
-.Sy .tmpl
-.Xr go 1
-'s
-.Sy text/template .
-All the files which aren't suffixed by
-.Sy .tmpl
+.Sy .tmpl (can
+be altered via
+.Fl e )
+.Xr go 1 's
+.Sy text/template
+(see
+.Lk https://pkg.go.dev/text/template )
+All files which aren't suffixed by
+.Ar .tmpl
 are copied from the input directory to the output directory.
 .Pp
 The input directory may furthermore contain:
 .Bl -enum
 .It
 A
-.Sy db.json
+.Ar db.json
 file and/or a
-.Sy db/
+.Ar db/
 directory: both of them describe a (deep) JSON-encoded database,
 which is made available to the executed templates (input pipeline
 is a hash containaing a
@@ -34,9 +49,86 @@ is a hash containaing a
 field);
 .It
 a
-.Sy template/
+.Ar templates/
 directory, which cotains a bunch of "utility" template files,
 which can call each other, and can be called from the
 .Sy .tmpl -suffixed
 files.
 .El
+.Pp
+By default, those files aren't preserved to the output
+directory, unless
+.Fl k
+is provided.
+.Sh TEMPLATE CONVENTIONS
+All the template files in the
+.Ar templates/
+directory are provided as
+.Em template Em functions ,
+meaning, a template file
+.Ar templates/foo
+is callable as
+.Bd -literal -offset indent
+    {{< foo arg0 arg1 >}}
+.Ed
+Or
+.Bd -literal -offset indent
+    {{< template "foo" wrap arg0 arg1 >}}
+.Ed
+.Pp
+Where
+.Ql wrap
+is a template functions, described in the next section.
+.Pp
+The point of
+.Ql wrap
+or of making the templates
+.Qq callable
+is to have them all share a similar interface: all the
+.Ar .tmpl
+suffixed files as well as all the templates from the
+.Ar templates/
+directory are provided with a
+.Qq hash-pipeline
+containing:
+.Bl -enum
+.It
+A
+.Ql db
+entry, which contains the parsed
+.Ar db.json
+and
+.Ar db/
+.It
+Eventually for the templates from the
+.Ar templates/
+directory, a
+.Ql args
+entry, which contains an array with all the arguments
+provided to the template.
+.El
+.Pp
+For example, the
+.Ql wrap
+function mentioned previously is implemented as follow:
+.Bd -literal -offset indent
+    "wrap" : func(xs ...any) any {
+    	return map[string]any {
+    		"db"   : db,
+    		"args" : xs,
+    	},
+    },
+.Ed
+.Pp
+The technique is described in greater details here:
+.Lk https://tales.mbivert.com/on-a-pool-of-go-templates/
+.Sh TEMPLATE FUNCTIONS
+For convenience, a few base functions are provided for
+use in the templates. TODO
+.Sh EXAMPLE
+Static site generator with a bunch of extra-templates:
+.Lk https://github.com/mbivert/bargue
+.Sh SEE ALSO
+.Xr dp 1
+(see
+.Lk https://github.com/mbivert/dp )
