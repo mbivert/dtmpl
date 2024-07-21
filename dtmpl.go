@@ -105,13 +105,13 @@ func loadFNs(ind string) (FNs, error) {
 
 		// Those have been loaded separately, and we
 		// don't want to bring them to the output directory
-		if keepSpecial && path == filepath.Join(ind, dbFn) {
+		if !keepSpecial && path == filepath.Join(ind, dbFn) {
 			return nil
 		}
-		if keepSpecial && strings.HasPrefix(path, filepath.Join(ind, dbDir)) {
+		if !keepSpecial && strings.HasPrefix(path, filepath.Join(ind, dbDir)) {
 			return nil
 		}
-		if keepSpecial && strings.HasPrefix(path, filepath.Join(ind, tmplsDir)) {
+		if !keepSpecial && strings.HasPrefix(path, filepath.Join(ind, tmplsDir)) {
 			return nil
 		}
 
