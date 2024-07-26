@@ -63,6 +63,73 @@ package main
 //		/tag1/index.html.tmpl
 //		...
 
+// A problem with the previous approach is that we can't programatically
+// generate the index.html.tmpl from the data related to .tags: for example
+// in the case of bargue -- w.r.t. what's done in bargue-pp.go -- we need
+// to generate say templates like {{%.pages.$name.$lang.url%}}/index.html.tmpl
+// (fantasist syntax), only for plates, that will be parametrized by the
+// $name, $lang and also the url:
+/*
+{{< header "fr" >}}
+
+{{< plate "plate_I-01_eyes" "fr" >}}
+
+{{< maybeparsefn "/fr/planche_I-01_yeux//index.html.content" >}}
+
+{{< footer "fr" >}}
+*/
+// We could adjust it as:
+/*
+{{< header "fr" >}}
+
+{{< plate "plate_I-01_eyes" "fr" >}}
+
+{{< maybeparsefn (printf "%s/%s" (index .db.pages "plates_I-01_eyes" "fr" "url") "index.html.content") >}}
+
+{{< footer "fr" >}}
+*/
+// Or even hide all in a template, which would at least reduce
+// the boilerplate
+/*
+{{< platepage "plate_I-01_eyes" "fr" >}}
+*/
+// Now, we could be smart, and from the previous template filename syntax
+// ({{%.pages.$id.$lang.url%}}/index.html.tmpl) prepend to the default .html.tmpl:
+//
+//	{{< platepage $id $lang >}}
+//
+// A list of variables, whose value would depend from how we're ranging on
+// variables in the template filename:
+//	{{< $id   := ... >}}
+//	{{< $lang := ... >}}
+// Hence the final generated templates would be things like:
+/*
+{{< $id   := ... >}}
+{{< $lang := ... >}}
+{{< platepage $id $lang >}}
+*/
+//
+// We would still have one issue: we'd be generating this for all pages, not
+// just for plates. Unless we had yet another indirection layer in the template
+// (eg. mkpage $id $lang which would call mkplatepage, mkgrouppage, etc.)
+//	-> This could be solve by using directories / different templates for each
+//	type of pages too, e.g.
+//	/plate/foo
+//	/group/bar
+//	/fr/planche/foo
+
+/*
+	Another option would be to have still a template filename such as
+		{{{% .pages.$id.$lang.url %}}}/index.html.tmpl
+	With index.html.tmpl containing
+		{{< platepage {{{ $id }}} {{{ $lang }}} >}}
+	Which, upon page creation, would be templatized a first time with
+	the relevant values for $id and $lang, e.g. we'll generate a file
+		/planche_I,01_yeux/index.html.tmpl
+	containing:
+		{{< platepage "plate_I,01_eyes" "fr" >}}
+*/
+
 // How about compiling multi-layered hashes, e.g.
 //	material : {
 //		pencil : {
