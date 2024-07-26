@@ -569,11 +569,13 @@ func dtmpl(ind, outd string) error {
 		panic("O__O")
 	}
 
+/*
 	a, _ := json.MarshalIndent(db, "", "    ")
 	fmt.Fprintf(os.Stderr, "db = %s\n", string(a))
 
 	b, _ := json.MarshalIndent(fns, "", "    ")
 	fmt.Fprintf(os.Stderr, "fns = %s\n", string(b))
+*/
 
 	// Generate file contents
 	return tmplFiles(outd, fns, db, []string{outd})
