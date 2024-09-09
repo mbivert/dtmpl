@@ -25,12 +25,13 @@ to an output directory
 .Ar output/ ,
 processing files suffixed by
 .Sy .tmpl (can
-be altered via
+be altered with
 .Fl e )
+via
 .Xr go 1 's
 .Sy text/template
 (see
-.Lk https://pkg.go.dev/text/template )
+.Lk https://pkg.go.dev/text/template ) .
 All files which aren't suffixed by
 .Ar .tmpl
 are copied from the input directory to the output directory.
@@ -44,13 +45,13 @@ file and/or a
 .Ar db/
 directory: both of them describe a (deep) JSON-encoded database,
 which is made available to the executed templates (input pipeline
-is a hash containaing a
+is a map containaing a
 .Sy "db"
 field);
 .It
 a
 .Ar templates/
-directory, which cotains a bunch of "utility" template files,
+directory, which contains a bunch of "utility" template files,
 which can call each other, and can be called from the
 .Sy .tmpl -suffixed
 files.
@@ -78,7 +79,7 @@ Or
 .Pp
 Where
 .Ql wrap
-is a template functions, described in the next section.
+is a template function, described in the next section.
 .Pp
 The point of
 .Ql wrap
@@ -89,7 +90,7 @@ is to have them all share a similar interface: all the
 suffixed files as well as all the templates from the
 .Ar templates/
 directory are provided with a
-.Qq hash-pipeline
+.Qq map-pipeline
 containing:
 .Bl -enum
 .It
