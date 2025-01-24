@@ -271,185 +271,195 @@ func pathExists(path string) (bool, error) {
 	return false, nil
 }
 
+var tmplFuncs = template.FuncMap{
+	"add" : func(a, b any) (int, error) {
+		an, ok := a.(int)
+		if !ok {
+			as, ok := a.(string)
+			if !ok {
+				return 0, fmt.Errorf("add: '%v' not an integer?", a)
+			}
+			var err error
+			an, err = strconv.Atoi(as)
+			if err != nil {
+				return 0, err
+			}
+		}
+
+		bn, ok := b.(int)
+		if !ok {
+			bs, ok := b.(string)
+			if !ok {
+				return 0, fmt.Errorf("add: '%v' not an integer?", b)
+			}
+			var err error
+			bn, err = strconv.Atoi(bs)
+			if err != nil {
+				return 0, err
+			}
+		}
+
+		return an+bn, nil
+	},
+	"append" :  func(xs []any, ys []any) []any {
+		return append(xs, ys...)
+	},
+	"arr" : func(xs ...any) []any {
+		return xs
+	},
+	"contains" : func(s, substr string) bool {
+		return strings.Contains(s, substr)
+	},
+	"datefmt" : func(ds, inf, outf string) (string, error) {
+		if inf == "" {
+			inf = time.RFC3339
+		}
+		if outf == "" {
+			outf = inf
+		}
+		d, err := time.Parse(inf, ds)
+		if err != nil {
+			return "", err
+		}
+		return d.Format(outf), nil
+	},
+	"exists" : func(path string) (bool, error) {
+		return pathExists(filepath.Join(ind, path))
+	},
+	"include" : func(path string) (string, error) {
+		path = filepath.Join(ind, path)
+		xs, err := os.ReadFile(path)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: inclusion failed '%s', %s\n", path, err)
+		}
+		return string(xs), err
+	},
+	"isURL" : func(s string) bool {
+		_, err := url.ParseRequestURI(s)
+		return err == nil
+	},
+	"join" : func(xs []any, d string) string {
+		ys := make([]string, len(xs))
+		for i, x := range xs {
+			ys[i] = fmt.Sprint(x)
+		}
+		return strings.Join(ys, d)
+	},
+	"now" : func() time.Time {
+		return time.Now()
+	},
+	"maybeparsefn" : func(ts string) (string, error) {
+		fn := filepath.Join(ind, ts)
+		ok, err := pathExists(fn)
+
+		// Shouldn't happen
+		if err != nil {
+			return "", err
+
+		// *maybe*
+		} else if !ok {
+			return "", nil
+		}
+
+		// The cloning will make all the utilities from the templates/
+		// directory available.
+		t, err := template.Must(tmpls.Clone()).Delims("{{<", ">}}").ParseFiles(fn)
+		if err != nil {
+			return "", err
+		}
+
+		// Because we've cloned, if we try a t.Execute(), we may be
+		// executing some random template from our template set. The
+		// one we've just added will have this name exactly:
+		tn := filepath.Base(fn)
+
+		var s strings.Builder
+		err = t.ExecuteTemplate(&s, tn, map[string]any{
+			"db" : db,
+		})
+		return s.String(), err
+	},
+	// XXX/TODO: which delimiters do we want here?
+	"parse" : func(ts string) (string, error) {
+		t, err := template.Must(tmpls.Clone()).Parse(ts)
+		if err != nil {
+			return "", err
+		}
+
+		var s strings.Builder
+		err = t.Execute(&s, map[string]any{
+			"db" : db,
+		})
+		return s.String(), err
+	},
+	// Some of that is more thoroughly documented here:
+	//	https://tales.mbivert.com/on-piping-go-templates-to-shell/
+	"run" : func(this *template.Template, cmd []string, x string, targs ...any) (string, error) {
+		t := template.Must(this.Clone())
+
+		if len(cmd) < 1 {
+			return "", fmt.Errorf("No command?")
+		}
+
+		args := cmd[1:]
+		if x != "" {
+			// NOTE: we use a file instead of a pipe to avoid having
+			// to deal with process synchronization
+			fn := filepath.Join("/tmp", x)
+			f, err := os.Create(fn)
+			if err != nil {
+				return "", err
+			}
+
+			err = t.ExecuteTemplate(f, x, map[string]any{
+				"args" : targs,
+				"this" : t,
+			})
+			f.Close()
+			if err != nil {
+				return "", err
+			}
+			args = append(cmd[1:], fn)
+		}
+
+		var s strings.Builder
+		com := exec.Command(cmd[0], args...)
+		com.Dir    = ind
+		com.Stdout = &s
+		com.Stderr = &s
+
+		if err := com.Run(); err != nil {
+			return "", err
+		}
+
+		return s.String(), nil
+	},
+	"sarr" : func(xs ...string) []string {
+		return xs
+	},
+	"warn" : func(s string) string {
+		fmt.Fprintf(os.Stderr, "Warning: %s\n", s)
+		return ""
+	},
+	"wrap" : func(xs ...any) any {
+		return map[string]any {
+			"db"   : db,
+			"args" : xs,
+		}
+	},
+}
+
 func loadTmpls(ind string, db DB) *template.Template {
-	var tmpls *template.Template
-	tmpls = template.Must(template.New("").Funcs(template.FuncMap{
-		"add" : func(a, b any) (int, error) {
-			an, ok := a.(int)
-			if !ok {
-				as, ok := a.(string)
-				if !ok {
-					return 0, fmt.Errorf("add: '%v' not an integer?", a)
-				}
-				var err error
-				an, err = strconv.Atoi(as)
-				if err != nil {
-					return 0, err
-				}
-			}
+	tmpl := template.New("").Funcs(tmplFuncs)
 
-			bn, ok := b.(int)
-			if !ok {
-				bs, ok := b.(string)
-				if !ok {
-					return 0, fmt.Errorf("add: '%v' not an integer?", b)
-				}
-				var err error
-				bn, err = strconv.Atoi(bs)
-				if err != nil {
-					return 0, err
-				}
-			}
-
-			return an+bn, nil
-		},
-		"append" :  func(xs []any, ys []any) []any {
-			return append(xs, ys...)
-		},
-		"arr" : func(xs ...any) []any {
-			return xs
-		},
-		"contains" : func(s, substr string) bool {
-			return strings.Contains(s, substr)
-		},
-		"datefmt" : func(ds, inf, outf string) (string, error) {
-			if inf == "" {
-				inf = time.RFC3339
-			}
-			if outf == "" {
-				outf = inf
-			}
-			d, err := time.Parse(inf, ds)
-			if err != nil {
-				return "", err
-			}
-			return d.Format(outf), nil
-		},
-		"exists" : func(path string) (bool, error) {
-			return pathExists(filepath.Join(ind, path))
-		},
-		"include" : func(path string) (string, error) {
-			path = filepath.Join(ind, path)
-			xs, err := os.ReadFile(path)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Warning: inclusion failed '%s', %s\n", path, err)
-			}
-			return string(xs), err
-		},
-		"isURL" : func(s string) bool {
-			_, err := url.ParseRequestURI(s)
-			return err == nil
-		},
-		"join" : func(xs []any, d string) string {
-			ys := make([]string, len(xs))
-			for i, x := range xs {
-				ys[i] = fmt.Sprint(x)
-			}
-			return strings.Join(ys, d)
-		},
-		"now" : func() time.Time {
-			return time.Now()
-		},
-		"maybeparsefn" : func(ts string) (string, error) {
-			fn := filepath.Join(ind, ts)
-			ok, err := pathExists(fn)
-
-			// Shouldn't happen
-			if err != nil {
-				return "", err
-
-			// *maybe*
-			} else if !ok {
-				return "", nil
-			}
-
-			// The cloning will make all the utilities from the templates/
-			// directory available.
-			t, err := template.Must(tmpls.Clone()).Delims("{{<", ">}}").ParseFiles(fn)
-			if err != nil {
-				return "", err
-			}
-
-			// Because we've cloned, if we try a t.Execute(), we may be
-			// executing some random template from our template set. The
-			// one we've just added will have this name exactly:
-			tn := filepath.Base(fn)
-
-			var s strings.Builder
-			err = t.ExecuteTemplate(&s, tn, map[string]any{
-				"db" : db,
-			})
-			return s.String(), err
-		},
-		// XXX/TODO: which delimiters do we want here?
-		"parse" : func(ts string) (string, error) {
-			t, err := template.Must(tmpls.Clone()).Parse(ts)
-			if err != nil {
-				return "", err
-			}
-
-			var s strings.Builder
-			err = t.Execute(&s, map[string]any{
-				"db" : db,
-			})
-			return s.String(), err
-		},
-		// Some of that is more thoroughly documented here:
-		//	https://tales.mbivert.com/on-piping-go-templates-to-shell/
-		"run" : func(this *template.Template, cmd []string, x string, targs ...any) (string, error) {
-			t := template.Must(this.Clone())
-
-			if len(cmd) < 1 {
-				return "", fmt.Errorf("No command?")
-			}
-
-			args := cmd[1:]
-			if x != "" {
-				// NOTE: we use a file instead of a pipe to avoid having
-				// to deal with process synchronization
-				fn := filepath.Join("/tmp", x)
-				f, err := os.Create(fn)
-				if err != nil {
-					return "", err
-				}
-
-				err = t.ExecuteTemplate(f, x, map[string]any{
-					"args" : targs,
-					"this" : t,
-				})
-				f.Close()
-				if err != nil {
-					return "", err
-				}
-				args = append(cmd[1:], fn)
-			}
-
-			var s strings.Builder
-			com := exec.Command(cmd[0], args...)
-			com.Dir    = ind
-			com.Stdout = &s
-			com.Stderr = &s
-
-			if err := com.Run(); err != nil {
-				return "", err
-			}
-
-			return s.String(), nil
-		},
-		"sarr" : func(xs ...string) []string {
-			return xs
-		},
-		"warn" : func(s string) string {
-			fmt.Fprintf(os.Stderr, "Warning: %s\n", s)
-			return ""
-		},
-		"wrap" : func(xs ...any) any {
-			return map[string]any {
-				"db"   : db,
-				"args" : xs,
-			}
-		},
-	}).ParseGlob(filepath.Join(ind, tmplsDir+"/*")))
+	tmpls, err := tmpl.ParseGlob(filepath.Join(ind, tmplsDir+"/*"))
+	if err != nil {
+		p := "template: pattern matches no files:"
+		if strings.Contains(err.Error(), p) {
+			return tmpl
+		}
+		panic(err)
+	}
 
 	// Make functions out of the default templates from the
 	// templates/ directory. For more, see
