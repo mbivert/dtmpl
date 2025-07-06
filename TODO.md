@@ -2,6 +2,10 @@
 This has been roughly tested by hand, but we'll want specific,
 per-function tests (some of them are bug-prone).
 
+# xjson
+DB reading code has been imported to [xjson](https://github.com/mbivert/xjson);
+we should be able to replace it.
+
 # Documentation @documentation @man-page
 Document the template functions.
 

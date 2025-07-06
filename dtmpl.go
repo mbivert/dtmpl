@@ -65,12 +65,14 @@ func splitPath(path string) []string {
 	return strings.Split(path, string(os.PathSeparator))
 }
 
-func addFn(ind string, fns FNs, path string) FNs {
+func addFn(ind string, fns FNs, path string, isDir bool) FNs {
 	xs := splitPath(path)
 	var p FNs
 	p = fns
 	for i, x := range xs {
-		if i == len(xs)-1 {
+		// if i == len(xs)-1 && isDir, then we have
+		// an empty directory.
+		if i == len(xs)-1 && !isDir {
 			// TODO: don't do this here, but when reading
 			// the files later on
 			p[x] = filepath.Join(ind, path)
@@ -118,7 +120,7 @@ func loadFNs(ind string) (FNs, error) {
 		// ind is filepath.Clean()'d ':/^func init\('
 		path = strings.TrimPrefix(path, ind+string(os.PathSeparator))
 
-		fns = addFn(ind, fns, path)
+		fns = addFn(ind, fns, path, info.IsDir())
 
 		return nil
 	})
@@ -452,6 +454,7 @@ var tmplFuncs = template.FuncMap{
 func loadTmpls(ind string, db DB) *template.Template {
 	tmpl := template.New("").Funcs(tmplFuncs)
 
+	// TODO: should be an os.ErrNotExist
 	tmpls, err := tmpl.ParseGlob(filepath.Join(ind, tmplsDir+"/*"))
 	if err != nil {
 		p := "template: pattern matches no files:"
@@ -630,16 +633,16 @@ func init() {
 	//
 	// We're now using os.Create() which truncates the files.
 	if err = os.RemoveAll(outd); err != nil {
-		fails(err)
+		fails(fmt.Errorf("removeall: %w", err))
 	}
 	if err = os.MkdirAll(outd, os.ModePerm); err != nil {
-		fails(err)
+		fails(fmt.Errorf("mkdirall: %w", err))
 	}
 
 	// Load input directory's database
 	db, err = loadDB(ind)
 	if err != nil {
-		fails(err)
+		fails(fmt.Errorf("loadb: %w", err))
 	}
 
 	// Load input directory's templates/ directory
