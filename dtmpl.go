@@ -23,7 +23,6 @@ package main
 // is stripped from its .tmpl suffix.
 
 import (
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -38,6 +37,8 @@ import (
 	"strings"
 	"text/template"
 	"time"
+
+	"github.com/mbivert/xjson"
 )
 
 // input/output directories
@@ -45,29 +46,25 @@ var ind, outd string
 
 // TODO: most of those should be CLI params
 var tmplExt = ".tmpl"
-var jsonExt = ".json"
 
 var dbDir = "db"
 var dbFn  = "db.json"
 
 var keepSpecial = false
 
+// TODO: allow multiple templates directory.
 var tmplsDir = "templates"
 
-type FNs map[string]any
-
-type DB map[string]any
-
 var tmpls *template.Template
-var db DB
+var db map[string]any
 
 func splitPath(path string) []string {
 	return strings.Split(path, string(os.PathSeparator))
 }
 
-func addFn(ind string, fns FNs, path string, isDir bool) FNs {
+func addFn(ind string, fns map[string]any, path string, isDir bool) map[string]any {
 	xs := splitPath(path)
-	var p FNs
+	var p map[string]any
 	p = fns
 	for i, x := range xs {
 		// if i == len(xs)-1 && isDir, then we have
@@ -78,11 +75,11 @@ func addFn(ind string, fns FNs, path string, isDir bool) FNs {
 			p[x] = filepath.Join(ind, path)
 		} else {
 			if _, ok := p[x]; !ok {
-				p[x] = make(FNs, 1)
+				p[x] = make(map[string]any, 1)
 			}
-			q, ok := p[x].(FNs)
+			q, ok := p[x].(map[string]any)
 			if !ok {
-				q = make(FNs, 1)
+				q = make(map[string]any, 1)
 				p[x] = q
 			}
 			p = q
@@ -92,8 +89,8 @@ func addFn(ind string, fns FNs, path string, isDir bool) FNs {
 	return fns
 }
 
-func loadFNs(ind string) (FNs, error) {
-	fns := make(FNs, 1)
+func loadFNs(ind string) (map[string]any, error) {
+	fns := make(map[string]any, 1)
 	err := filepath.Walk(ind, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -120,132 +117,12 @@ func loadFNs(ind string) (FNs, error) {
 		// ind is filepath.Clean()'d ':/^func init\('
 		path = strings.TrimPrefix(path, ind+string(os.PathSeparator))
 
-		fns = addFn(ind, fns, path, info.IsDir())
+		addFn(ind, fns, path, info.IsDir())
 
 		return nil
 	})
 
 	return fns, err
-}
-
-// TODO: path vs. fn naming convention
-func doParseDBFile(path string, to *any) error {
-	e := filepath.Ext(path)
-
-	bs, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-
-	if e == jsonExt {
-		if err := json.Unmarshal(bs, &to); err != nil {
-			return fmt.Errorf("%s: %s", path, err)
-		}
-	} else {
-		return fmt.Errorf("Unknown data/* format "+e)
-	}
-
-	return nil
-}
-
-func storeDBFile(ind, path string, db DB, y any) error {
-	// NOTE: extra os.PathSeparator is requires, for filepath.Join
-	// would trim it (even with a "db/"), and splitPath would return
-	// an array starting with an empty string.
-	xs := splitPath(
-		strings.TrimSuffix(
-			strings.TrimPrefix(path, filepath.Join(ind, dbDir)+string(os.PathSeparator)),
-			filepath.Ext(path),
-		),
-	)
-//	fmt.Fprintf(os.Stderr, path, xs)
-
-	var p map[string]any
-	p = db
-	for n, x := range xs {
-		if n == len(xs)-1 {
-			// merge y and p[x]; for now, this is
-			// only because we're storing internal
-			// URLs alongside external URLs, so
-			// as to have them all managed by the same
-			// template.
-			// XXX/TODO errors & cie
-			if z, ok := y.(map[string]any); ok {
-				if q, ok := p[x].(map[string]any); ok {
-					for k, v := range z {
-						q[k] = v
-					}
-					continue
-				}
-			}
-			p[x] = y
-			break
-		}
-		q, ok := p[x]
-		if !ok {
-			q := make(map[string]any)
-			p[x] = q
-			p = q
-		} else {
-			r, ok := q.(map[string]any)
-			if !ok {
-				// TODO: better error management
-				panic("x__x")
-			}
-			p = r
-		}
-	}
-
-	return nil
-}
-
-// TODO: manage deeper nesting / no-nesting
-func parseDBFile(ind, path string, db DB) error {
-	var y any
-	if err := doParseDBFile(path, &y); err != nil {
-		return err
-	}
-
-	return storeDBFile(ind, path, db, y)
-}
-
-func loadDBDir(ind string, db DB) (DB, error) {
-	dbd := filepath.Join(ind, dbDir)
-	err := filepath.Walk(dbd, func(path string, info fs.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if info.IsDir() {
-			return nil
-		}
-
-		return parseDBFile(ind, path, db)
-	})
-
-	return db, err
-}
-
-func loadDB(ind string) (DB, error) {
-	var db DB
-	fn := filepath.Join(ind, dbFn)
-	raw, err := os.ReadFile(fn)
-	if err != nil {
-		return nil, err
-	}
-	err = json.Unmarshal(raw, &db)
-	if err != nil {
-		return nil, fmt.Errorf("%s: %s", fn, err)
-	}
-	return loadDBDir(ind, db)
-}
-
-func getKeys[T any] (xs map[string]T) []string {
-	ks := make([]string, 0, len(xs))
-	for k := range xs {
-		ks = append(ks, k)
-	}
-	return ks
 }
 
 func copyFile(from, to string, perm os.FileMode) error {
@@ -254,11 +131,6 @@ func copyFile(from, to string, perm os.FileMode) error {
 		return err
 	}
 	return os.WriteFile(to, xs, perm)
-}
-
-func addToPATH(p string) string {
-	path := os.Getenv("PATH")
-	return path+":"+p
 }
 
 func pathExists(path string) (bool, error) {
@@ -451,7 +323,7 @@ var tmplFuncs = template.FuncMap{
 	},
 }
 
-func loadTmpls(ind string, db DB) *template.Template {
+func loadTmpls(ind string, db map[string]any) *template.Template {
 	tmpl := template.New("").Funcs(tmplFuncs)
 
 	// TODO: should be an os.ErrNotExist
@@ -486,33 +358,7 @@ func loadTmpls(ind string, db DB) *template.Template {
 	return tmpls
 }
 
-func deepGet(db DB, xs []string) (any, error) {
-	var p map[string]any
-	p = db
-	for n, x := range xs {
-		if n == len(xs)-1 {
-			return p[x], nil
-		}
-		q, ok := p[x]
-		if !ok {
-			break
-		}
-		r, ok := q.(map[string]any)
-		if !ok {
-			if _, ok := q.(string); ok {
-				return nil, fmt.Errorf("Can't go further in DB (%s)",
-					strings.Join(xs[:n], " -> "))
-			}
-			// Internal error (~assert)
-			panic("O__o")
-		}
-		p = r
-	}
-
-	return nil, fmt.Errorf("not found")
-}
-
-func tmplFile(from, to string, db DB) error {
+func tmplFile(from, to string, db map[string]any) error {
 	to = strings.TrimSuffix(to, tmplExt)
 
 	t, err := template.Must(tmpls.Clone()).Delims("{{<", ">}}").ParseFiles(from)
@@ -540,11 +386,11 @@ func tmplFile(from, to string, db DB) error {
 	})
 }
 
-func tmplFiles(outd string, tfns FNs, db DB, p []string) error {
+func tmplFiles(outd string, tfns map[string]any, db map[string]any, p []string) error {
 	for k, v := range tfns {
 		fn := filepath.Join((append(p, k))...)
 
-		if w, ok := v.(FNs); ok {
+		if w, ok := v.(map[string]any); ok {
 			if err := os.MkdirAll(fn, os.ModePerm); err != nil {
 				return err
 			}
@@ -578,7 +424,7 @@ func dtmpl(ind, outd string) error {
 
 	// filenames in fns are relative to ind
 	// (~assert)
-	if _, ok := fns[ind].(FNs); ok {
+	if _, ok := fns[ind].(map[string]any); ok {
 		panic("O__O")
 	}
 
@@ -640,9 +486,9 @@ func init() {
 	}
 
 	// Load input directory's database
-	db, err = loadDB(ind)
+	db, err = xjson.Read(filepath.Join(ind, dbFn))
 	if err != nil {
-		fails(fmt.Errorf("loadb: %w", err))
+		fails(fmt.Errorf("xjson.Read: %w", err))
 	}
 
 	// Load input directory's templates/ directory
