@@ -48,7 +48,7 @@ var ind, outd string
 var tmplExt = ".tmpl"
 
 var dbDir = "db"
-var dbFn  = "db.json"
+var dbFn = "db.json"
 
 var keepSpecial = false
 
@@ -146,7 +146,7 @@ func pathExists(path string) (bool, error) {
 }
 
 var tmplFuncs = template.FuncMap{
-	"add" : func(a, b any) (int, error) {
+	"add": func(a, b any) (int, error) {
 		an, ok := a.(int)
 		if !ok {
 			as, ok := a.(string)
@@ -173,18 +173,18 @@ var tmplFuncs = template.FuncMap{
 			}
 		}
 
-		return an+bn, nil
+		return an + bn, nil
 	},
-	"append" :  func(xs []any, ys []any) []any {
+	"append": func(xs []any, ys []any) []any {
 		return append(xs, ys...)
 	},
-	"arr" : func(xs ...any) []any {
+	"arr": func(xs ...any) []any {
 		return xs
 	},
-	"contains" : func(s, substr string) bool {
+	"contains": func(s, substr string) bool {
 		return strings.Contains(s, substr)
 	},
-	"datefmt" : func(ds, inf, outf string) (string, error) {
+	"datefmt": func(ds, inf, outf string) (string, error) {
 		if inf == "" {
 			inf = time.RFC3339
 		}
@@ -197,10 +197,10 @@ var tmplFuncs = template.FuncMap{
 		}
 		return d.Format(outf), nil
 	},
-	"exists" : func(path string) (bool, error) {
+	"exists": func(path string) (bool, error) {
 		return pathExists(filepath.Join(ind, path))
 	},
-	"include" : func(path string) (string, error) {
+	"include": func(path string) (string, error) {
 		path = filepath.Join(ind, path)
 		xs, err := os.ReadFile(path)
 		if err != nil {
@@ -208,21 +208,21 @@ var tmplFuncs = template.FuncMap{
 		}
 		return string(xs), err
 	},
-	"isURL" : func(s string) bool {
+	"isURL": func(s string) bool {
 		_, err := url.ParseRequestURI(s)
 		return err == nil
 	},
-	"join" : func(xs []any, d string) string {
+	"join": func(xs []any, d string) string {
 		ys := make([]string, len(xs))
 		for i, x := range xs {
 			ys[i] = fmt.Sprint(x)
 		}
 		return strings.Join(ys, d)
 	},
-	"now" : func() time.Time {
+	"now": func() time.Time {
 		return time.Now()
 	},
-	"maybeparsefn" : func(ts string) (string, error) {
+	"maybeparsefn": func(ts string) (string, error) {
 		fn := filepath.Join(ind, ts)
 		ok, err := pathExists(fn)
 
@@ -230,7 +230,7 @@ var tmplFuncs = template.FuncMap{
 		if err != nil {
 			return "", err
 
-		// *maybe*
+			// *maybe*
 		} else if !ok {
 			return "", nil
 		}
@@ -249,12 +249,12 @@ var tmplFuncs = template.FuncMap{
 
 		var s strings.Builder
 		err = t.ExecuteTemplate(&s, tn, map[string]any{
-			"db" : db,
+			"db": db,
 		})
 		return s.String(), err
 	},
 	// XXX/TODO: which delimiters do we want here?
-	"parse" : func(ts string) (string, error) {
+	"parse": func(ts string) (string, error) {
 		t, err := template.Must(tmpls.Clone()).Parse(ts)
 		if err != nil {
 			return "", err
@@ -262,13 +262,13 @@ var tmplFuncs = template.FuncMap{
 
 		var s strings.Builder
 		err = t.Execute(&s, map[string]any{
-			"db" : db,
+			"db": db,
 		})
 		return s.String(), err
 	},
 	// Some of that is more thoroughly documented here:
 	//	https://tales.mbivert.com/on-piping-go-templates-to-shell/
-	"run" : func(this *template.Template, cmd []string, x string, targs ...any) (string, error) {
+	"run": func(this *template.Template, cmd []string, x string, targs ...any) (string, error) {
 		t := template.Must(this.Clone())
 
 		if len(cmd) < 1 {
@@ -286,8 +286,8 @@ var tmplFuncs = template.FuncMap{
 			}
 
 			err = t.ExecuteTemplate(f, x, map[string]any{
-				"args" : targs,
-				"this" : t,
+				"args": targs,
+				"this": t,
 			})
 			f.Close()
 			if err != nil {
@@ -298,7 +298,7 @@ var tmplFuncs = template.FuncMap{
 
 		var s strings.Builder
 		com := exec.Command(cmd[0], args...)
-		com.Dir    = ind
+		com.Dir = ind
 		com.Stdout = &s
 		com.Stderr = &s
 
@@ -308,17 +308,17 @@ var tmplFuncs = template.FuncMap{
 
 		return s.String(), nil
 	},
-	"sarr" : func(xs ...string) []string {
+	"sarr": func(xs ...string) []string {
 		return xs
 	},
-	"warn" : func(s string) string {
+	"warn": func(s string) string {
 		fmt.Fprintf(os.Stderr, "Warning: %s\n", s)
 		return ""
 	},
-	"wrap" : func(xs ...any) any {
-		return map[string]any {
-			"db"   : db,
-			"args" : xs,
+	"wrap": func(xs ...any) any {
+		return map[string]any{
+			"db":   db,
+			"args": xs,
 		}
 	},
 }
@@ -344,11 +344,11 @@ func loadTmpls(ind string, db map[string]any) *template.Template {
 		// beware of the race...
 		m := x.Name()
 		tmpls.Funcs(template.FuncMap{
-			n : func(ys ...any) (string, error) {
+			n: func(ys ...any) (string, error) {
 				var s strings.Builder
 				err := tmpls.ExecuteTemplate(&s, m, map[string]any{
-					"args" : ys,
-					"db"   : db,
+					"args": ys,
+					"db":   db,
 				})
 				return s.String(), err
 			},
@@ -364,7 +364,7 @@ func tmplFile(from, to string, db map[string]any) error {
 	t, err := template.Must(tmpls.Clone()).Delims("{{<", ">}}").ParseFiles(from)
 
 	if err != nil {
-		return err
+		return fmt.Errorf("%s: %w", from, err)
 	}
 
 	// os.Create will truncate (os.O_TRUNC) the file. That's
@@ -372,7 +372,7 @@ func tmplFile(from, to string, db map[string]any) error {
 	fh, err := os.Create(to)
 	defer fh.Close()
 	if err != nil {
-		return err
+		return fmt.Errorf("%s: %w", from, err)
 	}
 
 	// NOTE: all templates (see ':/^func loadTmpls\(', especially the
@@ -380,10 +380,14 @@ func tmplFile(from, to string, db map[string]any) error {
 	// pipeline. Said hash contains at least a .db.
 	//
 	// We're trying to make this interface more "uniform".
-	return t.ExecuteTemplate(fh, filepath.Base(from), map[string]any{
-		"db"   : db,
-		"this" : t, // seems it's still used for run()
+	err = t.ExecuteTemplate(fh, filepath.Base(from), map[string]any{
+		"db":   db,
+		"this": t, // seems it's still used for run()
 	})
+	if err != nil {
+		return fmt.Errorf("%s: %w", from, err)
+	}
+	return nil
 }
 
 func tmplFiles(outd string, tfns map[string]any, db map[string]any, p []string) error {
@@ -428,13 +432,13 @@ func dtmpl(ind, outd string) error {
 		panic("O__O")
 	}
 
-/*
-	a, _ := json.MarshalIndent(db, "", "    ")
-	fmt.Fprintf(os.Stderr, "db = %s\n", string(a))
+	/*
+		a, _ := json.MarshalIndent(db, "", "    ")
+		fmt.Fprintf(os.Stderr, "db = %s\n", string(a))
 
-	b, _ := json.MarshalIndent(fns, "", "    ")
-	fmt.Fprintf(os.Stderr, "fns = %s\n", string(b))
-*/
+		b, _ := json.MarshalIndent(fns, "", "    ")
+		fmt.Fprintf(os.Stderr, "fns = %s\n", string(b))
+	*/
 
 	// Generate file contents
 	return tmplFiles(outd, fns, db, []string{outd})
@@ -456,7 +460,7 @@ func init() {
 
 	// TODO: have those+tmplsDir be not relative to ind but paths
 	// to exact files instead (too magic)
-	flag.StringVar(&dbFn,  "f",  dbFn,  "Default path to db.json (relative to ind)")
+	flag.StringVar(&dbFn, "f", dbFn, "Default path to db.json (relative to ind)")
 	flag.StringVar(&dbDir, "d", dbDir, "Default path to db/ (relative to ind)")
 
 	flag.StringVar(&tmplExt, "e", tmplExt, "Default template files extension")
